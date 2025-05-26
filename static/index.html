@@ -224,7 +224,6 @@ func main() {
             const code = editor.getValue();
 
             try {
-                // 使用 gofmt 格式化代码
                 const response = await fetch("/format", {
                     method: "POST",
                     headers: {
@@ -239,11 +238,8 @@ func main() {
                     document.getElementById("output").innerHTML =
                         `<span class="error">Format error: ${result.error}</span>`;
                 } else {
-                    // 保存当前光标位置
                     const cursor = editor.getCursor();
-                    // 更新编辑器内容
                     editor.setValue(result.formattedCode);
-                    // 恢复光标位置
                     editor.setCursor(cursor);
                     document.getElementById("output").textContent = "Code formatted successfully!";
                 }
@@ -255,7 +251,6 @@ func main() {
             }
         }
 
-        // 添加键盘快捷键提示
         document.addEventListener('DOMContentLoaded', () => {
             const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
             const runButton = document.querySelector('.run-button');

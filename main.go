@@ -1,3 +1,5 @@
+// Go Playground 后端服务
+// 提供代码执行和格式化功能
 package main
 
 import (
@@ -12,30 +14,38 @@ import (
 	"path/filepath"
 )
 
+// CodeRequest 定义了接收代码的请求结构
 type CodeRequest struct {
-	Code string `json:"code"`
+	Code string `json:"code"` // 用户提交的代码
 }
 
+// CodeResponse 定义了代码执行的响应结构
 type CodeResponse struct {
-	Output string `json:"output"`
-	Error  string `json:"error,omitempty"`
+	Output string `json:"output"`          // 代码执行的输出结果
+	Error  string `json:"error,omitempty"` // 执行过程中的错误信息（如果有）
 }
 
+// FormatResponse 定义了代码格式化的响应结构
 type FormatResponse struct {
-	FormattedCode string `json:"formattedCode"`
-	Error         string `json:"error,omitempty"`
+	FormattedCode string `json:"formattedCode"`   // 格式化后的代码
+	Error         string `json:"error,omitempty"` // 格式化过程中的错误信息（如果有）
 }
 
 func main() {
-	http.HandleFunc("/", serveStatic)
-	http.HandleFunc("/run", handleCodeExecution)
-	http.HandleFunc("/format", handleCodeFormat)
+	// 注册路由处理函数
+	http.HandleFunc("/", serveStatic)            // 处理静态文件请求
+	http.HandleFunc("/run", handleCodeExecution) // 处理代码执行请求
+	http.HandleFunc("/format", handleCodeFormat) // 处理代码格式化请求
 
+	// 启动服务器
 	port := ":8081"
 	fmt.Printf("Server running on http://localhost%s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
+// serveStatic 处理静态文件的请求
+// 如果请求根路径，返回 index.html
+// 其他静态文件请求直接从 static 目录提供服务
 func serveStatic(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/" {
 		http.ServeFile(w, r, "static/index.html")
@@ -44,6 +54,10 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.Dir("static")).ServeHTTP(w, r)
 }
 
+// handleCodeExecution 处理代码执行请求
+// 1. 验证请求方法
+// 2. 解析请求体中的代码
+// 3. 执行代码并返回结果
 func handleCodeExecution(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -66,6 +80,10 @@ func handleCodeExecution(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// handleCodeFormat 处理代码格式化请求
+// 1. 验证请求方法
+// 2. 解析请求体中的代码
+// 3. 使用 gofmt 格式化代码并返回结果
 func handleCodeFormat(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -88,20 +106,26 @@ func handleCodeFormat(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// formatCode 使用 gofmt 格式化 Go 代码
+// 1. 创建临时目录和文件
+// 2. 将代码写入临时文件
+// 3. 使用 gofmt 格式化代码
+// 4. 返回格式化后的代码
 func formatCode(code string) (string, error) {
-	// 创建一个临时文件来存储代码
+	// 创建临时目录
 	tmpDir, err := os.MkdirTemp("", "goformat")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// 创建临时文件并写入代码
 	tmpFile := filepath.Join(tmpDir, "code.go")
 	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
 		return "", fmt.Errorf("failed to write code file: %v", err)
 	}
 
-	// 运行 gofmt
+	// 运行 gofmt 格式化代码
 	cmd := exec.Command("gofmt", tmpFile)
 	var out bytes.Buffer
 	var stderr bytes.Buffer
@@ -116,21 +140,26 @@ func formatCode(code string) (string, error) {
 	return out.String(), nil
 }
 
+// executeCode 执行 Go 代码并返回执行结果
+// 1. 创建临时目录和文件
+// 2. 将代码写入临时文件
+// 3. 执行代码并捕获输出
+// 4. 返回执行结果
 func executeCode(code string) (string, error) {
-	// Create a temporary directory
+	// 创建临时目录
 	tmpDir, err := os.MkdirTemp("", "goplayground")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp directory: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create a temporary file for the code
+	// 创建临时文件并写入代码
 	tmpFile := filepath.Join(tmpDir, "main.go")
 	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
 		return "", fmt.Errorf("failed to write code file: %v", err)
 	}
 
-	// Run the code
+	// 执行代码
 	cmd := exec.Command("go", "run", tmpFile)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -146,7 +175,7 @@ func executeCode(code string) (string, error) {
 		return "", fmt.Errorf("failed to start command: %v", err)
 	}
 
-	// Combine stdout and stderr
+	// 收集程序输出
 	output := make(chan string)
 	go func() {
 		combined := ""
