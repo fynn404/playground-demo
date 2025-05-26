@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,9 +21,15 @@ type CodeResponse struct {
 	Error  string `json:"error,omitempty"`
 }
 
+type FormatResponse struct {
+	FormattedCode string `json:"formattedCode"`
+	Error         string `json:"error,omitempty"`
+}
+
 func main() {
 	http.HandleFunc("/", serveStatic)
 	http.HandleFunc("/run", handleCodeExecution)
+	http.HandleFunc("/format", handleCodeFormat)
 
 	port := ":8081"
 	fmt.Printf("Server running on http://localhost%s\n", port)
@@ -57,6 +64,56 @@ func handleCodeExecution(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func handleCodeFormat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req CodeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	formattedCode, err := formatCode(req.Code)
+	resp := FormatResponse{FormattedCode: formattedCode}
+	if err != nil {
+		resp.Error = err.Error()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func formatCode(code string) (string, error) {
+	// 创建一个临时文件来存储代码
+	tmpDir, err := os.MkdirTemp("", "goformat")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tmpFile := filepath.Join(tmpDir, "code.go")
+	if err := os.WriteFile(tmpFile, []byte(code), 0644); err != nil {
+		return "", fmt.Errorf("failed to write code file: %v", err)
+	}
+
+	// 运行 gofmt
+	cmd := exec.Command("gofmt", tmpFile)
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	err = cmd.Run()
+	if err != nil {
+		return "", fmt.Errorf("format error: %v\n%s", err, stderr.String())
+	}
+
+	return out.String(), nil
 }
 
 func executeCode(code string) (string, error) {

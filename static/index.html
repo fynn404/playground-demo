@@ -22,6 +22,9 @@
 
         .header {
             margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .header h1 {
@@ -49,19 +52,34 @@
             gap: 10px;
         }
 
-        .run-button {
-            background-color: #00ADD8;
-            color: white;
-            border: none;
+        .button {
             padding: 10px 20px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 16px;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .run-button {
+            background-color: #00ADD8;
+            color: white;
         }
 
         .run-button:hover {
             background-color: #0092BF;
+        }
+
+        .format-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .format-button:hover {
+            background-color: #45a049;
         }
 
         .output {
@@ -81,6 +99,31 @@
         .error {
             color: #D32F2F;
         }
+
+        .spinner {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 5px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .button.loading .spinner {
+            display: inline-block;
+        }
     </style>
 </head>
 
@@ -92,7 +135,14 @@
         <div class="editor-container">
             <textarea id="editor"></textarea>
             <div class="controls">
-                <button class="run-button" onclick="runCode()">Run Code</button>
+                <button class="button run-button" onclick="runCode()">
+                    Run Code
+                    <div class="spinner"></div>
+                </button>
+                <button class="button format-button" onclick="formatCode()">
+                    Format Code
+                    <div class="spinner"></div>
+                </button>
             </div>
         </div>
         <div class="output">
@@ -112,6 +162,21 @@
             autoCloseBrackets: true,
             matchBrackets: true,
             lineWrapping: true,
+            tabSize: 4,
+            indentWithTabs: true,
+            extraKeys: {
+                "Ctrl-Enter": runCode,
+                "Cmd-Enter": runCode,
+                "Ctrl-S": formatCode,
+                "Cmd-S": formatCode,
+                "Tab": function (cm) {
+                    if (cm.somethingSelected()) {
+                        cm.indentSelection("add");
+                    } else {
+                        cm.replaceSelection("\t");
+                    }
+                }
+            }
         });
 
         // Set default code
@@ -125,6 +190,8 @@ func main() {
         editor.setValue(defaultCode);
 
         async function runCode() {
+            const runButton = document.querySelector('.run-button');
+            runButton.classList.add('loading');
             const code = editor.getValue();
             const outputElement = document.getElementById("output");
 
@@ -146,8 +213,57 @@ func main() {
                 }
             } catch (error) {
                 outputElement.innerHTML = `<span class="error">Error: ${error.message}</span>`;
+            } finally {
+                runButton.classList.remove('loading');
             }
         }
+
+        async function formatCode() {
+            const formatButton = document.querySelector('.format-button');
+            formatButton.classList.add('loading');
+            const code = editor.getValue();
+
+            try {
+                // 使用 gofmt 格式化代码
+                const response = await fetch("/format", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ code }),
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    document.getElementById("output").innerHTML =
+                        `<span class="error">Format error: ${result.error}</span>`;
+                } else {
+                    // 保存当前光标位置
+                    const cursor = editor.getCursor();
+                    // 更新编辑器内容
+                    editor.setValue(result.formattedCode);
+                    // 恢复光标位置
+                    editor.setCursor(cursor);
+                    document.getElementById("output").textContent = "Code formatted successfully!";
+                }
+            } catch (error) {
+                document.getElementById("output").innerHTML =
+                    `<span class="error">Format error: ${error.message}</span>`;
+            } finally {
+                formatButton.classList.remove('loading');
+            }
+        }
+
+        // 添加键盘快捷键提示
+        document.addEventListener('DOMContentLoaded', () => {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const runButton = document.querySelector('.run-button');
+            const formatButton = document.querySelector('.format-button');
+
+            runButton.title = `Run Code (${isMac ? 'Cmd' : 'Ctrl'} + Enter)`;
+            formatButton.title = `Format Code (${isMac ? 'Cmd' : 'Ctrl'} + S)`;
+        });
     </script>
 </body>
 
